@@ -78,7 +78,7 @@ public class AxonConfig {
             case TRACKING:
                 eventProcessingModule.usingTrackingEventProcessors();
                 eventProcessingModule.registerTrackingEventProcessorConfiguration((configuration) ->
-                        TrackingEventProcessorConfiguration.forParallelProcessing(2));
+                        TrackingEventProcessorConfiguration.forSingleThreadedProcessing());
                 break;
             case SWITCHING:
                 eventProcessingModule.registerEventProcessorFactory(
@@ -94,7 +94,7 @@ public class AxonConfig {
         return AnnotationCommandTargetResolver.builder().build();
     }
 
-    enum EventProcessorType {
+    public enum EventProcessorType {
         SUBSCRIBING,
         TRACKING,
         SWITCHING,
