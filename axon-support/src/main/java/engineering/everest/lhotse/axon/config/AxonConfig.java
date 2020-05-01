@@ -12,6 +12,7 @@ import org.axonframework.commandhandling.gateway.IntervalRetryScheduler;
 import org.axonframework.commandhandling.gateway.RetryScheduler;
 import org.axonframework.common.transaction.TransactionManager;
 import org.axonframework.config.EventProcessingModule;
+import org.axonframework.eventhandling.TrackingEventProcessorConfiguration;
 import org.axonframework.messaging.MessageDispatchInterceptor;
 import org.axonframework.messaging.interceptors.CorrelationDataInterceptor;
 import org.axonframework.modelling.command.AnnotationCommandTargetResolver;
@@ -66,14 +67,36 @@ public class AxonConfig {
 
     @Autowired
     public void configure(AxonConfiguration axonConfiguration,
-                          EventProcessingModule eventProcessingModule) {
+                          EventProcessingModule eventProcessingModule,
+                          @Value("${application.axon.event-processor.type:switching}") EventProcessorType eventProcessorType) {
+
         eventProcessingModule.byDefaultAssignTo("default");
-        eventProcessingModule.registerEventProcessorFactory(
-                new SwitchingEventProcessorBuilder(axonConfiguration, eventProcessingModule));
+        switch (eventProcessorType) {
+            case SUBSCRIBING:
+                eventProcessingModule.usingSubscribingEventProcessors();
+                break;
+            case TRACKING:
+                eventProcessingModule.usingTrackingEventProcessors();
+                eventProcessingModule.registerTrackingEventProcessorConfiguration((configuration) ->
+                        TrackingEventProcessorConfiguration.forParallelProcessing(2));
+                break;
+            case SWITCHING:
+                eventProcessingModule.registerEventProcessorFactory(
+                        new SwitchingEventProcessorBuilder(axonConfiguration, eventProcessingModule));
+                break;
+            default:
+                throw new IllegalArgumentException(String.format("Unrecognised event processor type: %s", eventProcessorType));
+        }
     }
 
     @Bean
     public AnnotationCommandTargetResolver annotationCommandTargetResolver() {
         return AnnotationCommandTargetResolver.builder().build();
+    }
+
+    enum EventProcessorType {
+        SUBSCRIBING,
+        TRACKING,
+        SWITCHING,
     }
 }
