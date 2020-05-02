@@ -1,28 +1,35 @@
 package engineering.everest.lhotse.axon.replay;
 
 import lombok.experimental.Delegate;
+import lombok.extern.slf4j.Slf4j;
 import org.axonframework.common.transaction.TransactionManager;
-import org.axonframework.eventhandling.EventProcessor;
+import org.axonframework.eventhandling.EventTrackerStatus;
 import org.axonframework.eventhandling.TrackingEventProcessor;
 import org.axonframework.eventhandling.TrackingToken;
 import org.axonframework.eventhandling.tokenstore.TokenStore;
 
-public class SwitchingAwareTrackingEventProcessor implements EventProcessor {
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+
+@Slf4j
+public class SwitchingAwareTrackingEventProcessor implements ReplayableEventProcessor {
 
     @Delegate(excludes = Resettable.class)
-    private final TrackingEventProcessor trackingEventProcessor;
+    private final TrackingEventProcessor delegate;
     private final TransactionManager transactionManager;
     private final TokenStore tokenStore;
     private final int initialSegmentsCount;
+    private final ScheduledExecutorService statusChecker;
 
-    public SwitchingAwareTrackingEventProcessor(TrackingEventProcessor trackingEventProcessor,
+    public SwitchingAwareTrackingEventProcessor(TrackingEventProcessor delegate,
                                                 TransactionManager transactionManager,
                                                 TokenStore tokenStore,
                                                 int initialSegmentsCount) {
-        this.trackingEventProcessor = trackingEventProcessor;
+        this.delegate = delegate;
         this.transactionManager = transactionManager;
         this.tokenStore = tokenStore;
         this.initialSegmentsCount = initialSegmentsCount;
+        statusChecker = Executors.newSingleThreadScheduledExecutor();
     }
 
     /**
@@ -40,7 +47,26 @@ public class SwitchingAwareTrackingEventProcessor implements EventProcessor {
                 tokenStore.initializeTokenSegments(getName(), initialSegmentsCount, headToken);
             }
         });
-        trackingEventProcessor.resetTokens(startPosition);
+        delegate.resetTokens(startPosition);
+    }
+
+    @Override
+    public void startReplay(TrackingToken startPosition) {
+        LOGGER.info("Start replay {}", this);
+        delegate.shutDown();
+        resetTokens(startPosition);
+        delegate.start();
+//        statusChecker.scheduleAtFixedRate()
+    }
+
+    @Override
+    public void stopReplay() {
+
+    }
+
+    @Override
+    public boolean isRelaying() {
+        return delegate.processingStatus().values().stream().anyMatch(EventTrackerStatus::isReplaying);
     }
 
     private interface Resettable {

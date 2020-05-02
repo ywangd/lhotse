@@ -70,7 +70,7 @@ public class AxonConfig {
                           EventProcessingModule eventProcessingModule,
                           @Value("${application.axon.event-processor.type:switching}") EventProcessorType eventProcessorType) {
 
-        eventProcessingModule.byDefaultAssignTo("default");
+//        eventProcessingModule.byDefaultAssignTo("default");
         switch (eventProcessorType) {
             case SUBSCRIBING:
                 eventProcessingModule.usingSubscribingEventProcessors();
@@ -78,7 +78,7 @@ public class AxonConfig {
             case TRACKING:
                 eventProcessingModule.usingTrackingEventProcessors();
                 eventProcessingModule.registerTrackingEventProcessorConfiguration((configuration) ->
-                        TrackingEventProcessorConfiguration.forSingleThreadedProcessing());
+                        TrackingEventProcessorConfiguration.forParallelProcessing(2));
                 break;
             case SWITCHING:
                 eventProcessingModule.registerEventProcessorFactory(

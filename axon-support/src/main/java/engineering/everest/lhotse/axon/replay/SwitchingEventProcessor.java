@@ -16,7 +16,7 @@ import java.util.List;
 import static org.axonframework.lifecycle.Phase.LOCAL_MESSAGE_HANDLER_REGISTRATIONS;
 
 @Slf4j
-public class SwitchingEventProcessor implements EventProcessor {
+public class SwitchingEventProcessor implements ReplayableEventProcessor {
 
     private final SubscribingEventProcessor subscribingEventProcessor;
     private final SwitchingAwareTrackingEventProcessor trackingEventProcessor;
@@ -30,17 +30,19 @@ public class SwitchingEventProcessor implements EventProcessor {
         this.currentEventProcessor = subscribingEventProcessor;
     }
 
-    public void startReplay(TrackingToken trackingToken) {
+    @Override
+    public void startReplay(TrackingToken startPosition) {
         synchronized (this) {
             LOGGER.info(String.format("Starting replay and switching to %s", TrackingEventProcessor.class.getSimpleName()));
             currentEventProcessor.shutDown();
             currentEventProcessor = trackingEventProcessor;
-            trackingEventProcessor.resetTokens(trackingToken);
+            trackingEventProcessor.resetTokens(startPosition);
             start();
             LOGGER.info("Started replay");
         }
     }
 
+    @Override
     public void stopReplay() {
         synchronized (this) {
             LOGGER.info(String.format("Stopping replay and switching to %s", SubscribingEventProcessor.class.getSimpleName()));
@@ -51,6 +53,7 @@ public class SwitchingEventProcessor implements EventProcessor {
         }
     }
 
+    @Override
     @SuppressWarnings("PMD.CompareObjectsWithEquals")
     public boolean isRelaying() {
         return currentEventProcessor == trackingEventProcessor;
