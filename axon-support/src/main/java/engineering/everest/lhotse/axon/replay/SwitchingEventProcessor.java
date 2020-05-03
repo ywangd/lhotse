@@ -61,7 +61,7 @@ public class SwitchingEventProcessor implements ReplayableEventProcessor {
     @Override
     @SuppressWarnings("PMD.CompareObjectsWithEquals")
     public boolean isRelaying() {
-        return currentEventProcessor.get() == trackingEventProcessor;
+        return currentEventProcessor.get() == trackingEventProcessor && trackingEventProcessor.isRelaying();
     }
 
     @Override

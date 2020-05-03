@@ -74,6 +74,7 @@ public class ReplayEndpoint implements MonitorCallback {
 
     @Override
     public void reportSuccess() {
+        LOGGER.info("reportSuccess");
         if (!replayingProcessors.isEmpty()) {
             maybeStopReplay();
         }
@@ -81,6 +82,7 @@ public class ReplayEndpoint implements MonitorCallback {
 
     @Override
     public void reportFailure(Throwable cause) {
+        LOGGER.info("reportFailure");
         if (!replayingProcessors.isEmpty()) {
             maybeStopReplay();
         }
@@ -88,6 +90,7 @@ public class ReplayEndpoint implements MonitorCallback {
 
     @Override
     public void reportIgnored() {
+        LOGGER.info("reportIgnored");
         if (!replayingProcessors.isEmpty()) {
             maybeStopReplay();
         }
@@ -99,6 +102,7 @@ public class ReplayEndpoint implements MonitorCallback {
         }
 
         if (replayingProcessors.stream().noneMatch(ReplayableEventProcessor::isRelaying)) {
+            LOGGER.info("Replay completed, stopping ...");
             try {
                 replayingProcessors.forEach(ReplayableEventProcessor::stopReplay);
                 resetCompletionAwares.forEach(ReplayCompletionAware::replayCompleted);
