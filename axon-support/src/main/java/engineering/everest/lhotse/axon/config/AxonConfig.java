@@ -2,6 +2,7 @@ package engineering.everest.lhotse.axon.config;
 
 import engineering.everest.lhotse.axon.CommandValidatingMessageHandlerInterceptor;
 import engineering.everest.lhotse.axon.LoggingMessageHandlerInterceptor;
+import engineering.everest.lhotse.axon.replay.MarkerEventMessageMonitor;
 import engineering.everest.lhotse.axon.replay.SwitchingEventProcessorBuilder;
 import lombok.extern.slf4j.Slf4j;
 import org.axonframework.commandhandling.CommandBus;
@@ -12,10 +13,13 @@ import org.axonframework.commandhandling.gateway.IntervalRetryScheduler;
 import org.axonframework.commandhandling.gateway.RetryScheduler;
 import org.axonframework.common.transaction.TransactionManager;
 import org.axonframework.config.EventProcessingModule;
+import org.axonframework.eventhandling.EventProcessor;
 import org.axonframework.eventhandling.TrackingEventProcessorConfiguration;
 import org.axonframework.messaging.MessageDispatchInterceptor;
 import org.axonframework.messaging.interceptors.CorrelationDataInterceptor;
 import org.axonframework.modelling.command.AnnotationCommandTargetResolver;
+import org.axonframework.monitoring.MultiMessageMonitor;
+import org.axonframework.monitoring.NoOpMessageMonitor;
 import org.axonframework.spring.config.AxonConfiguration;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
@@ -68,9 +72,21 @@ public class AxonConfig {
     @Autowired
     public void configure(AxonConfiguration axonConfiguration,
                           EventProcessingModule eventProcessingModule,
-                          @Value("${application.axon.event-processor.type:switching}") EventProcessorType eventProcessorType) {
+                          @Value("${application.axon.event-processor.type:switching}") EventProcessorType eventProcessorType,
+                          MarkerEventMessageMonitor markerEventMessageMonitor) {
 
-//        eventProcessingModule.byDefaultAssignTo("default");
+        String processingGroup = "default";
+        eventProcessingModule.byDefaultAssignTo(processingGroup);
+        eventProcessingModule.registerMessageMonitor(processingGroup,
+                configuration -> {
+                    var existingMonitor = configuration.messageMonitor(EventProcessor.class, processingGroup);
+                    if (existingMonitor instanceof NoOpMessageMonitor) {
+                        return markerEventMessageMonitor;
+                    } else {
+                        return new MultiMessageMonitor<>(existingMonitor, markerEventMessageMonitor);
+                    }
+                });
+
         switch (eventProcessorType) {
             case SUBSCRIBING:
                 eventProcessingModule.usingSubscribingEventProcessors();
@@ -85,7 +101,8 @@ public class AxonConfig {
                         new SwitchingEventProcessorBuilder(axonConfiguration, eventProcessingModule));
                 break;
             default:
-                throw new IllegalArgumentException(String.format("Unrecognised event processor type: %s", eventProcessorType));
+                throw new IllegalArgumentException(String.format("Unrecognised event processor type: %s",
+                        eventProcessorType));
         }
     }
 

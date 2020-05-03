@@ -37,7 +37,7 @@ public class SwitchingEventProcessorBuilder implements EventProcessorBuilder {
             TransactionManager transactionManager = eventProcessingModule.transactionManager(name);
             TrackingEventProcessorConfiguration trackingEventProcessorConfiguration = axonConfiguration.getComponent(
                     TrackingEventProcessorConfiguration.class,
-                    TrackingEventProcessorConfiguration::forSingleThreadedProcessing);
+                    () -> TrackingEventProcessorConfiguration.forParallelProcessing(2));
             TrackingEventProcessor trackingEventProcessor = TrackingEventProcessor.builder()
                     .name(name)
                     .eventHandlerInvoker(eventHandlerInvoker)

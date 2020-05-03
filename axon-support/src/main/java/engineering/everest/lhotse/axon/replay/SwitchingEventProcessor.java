@@ -12,6 +12,7 @@ import org.axonframework.lifecycle.StartHandler;
 import org.axonframework.messaging.MessageHandlerInterceptor;
 
 import java.util.List;
+import java.util.concurrent.atomic.AtomicReference;
 
 import static org.axonframework.lifecycle.Phase.LOCAL_MESSAGE_HANDLER_REGISTRATIONS;
 
@@ -21,68 +22,72 @@ public class SwitchingEventProcessor implements ReplayableEventProcessor {
     private final SubscribingEventProcessor subscribingEventProcessor;
     private final SwitchingAwareTrackingEventProcessor trackingEventProcessor;
 
-    private EventProcessor currentEventProcessor;
+    private final AtomicReference<EventProcessor> currentEventProcessor;
 
     public SwitchingEventProcessor(SubscribingEventProcessor subscribingEventProcessor,
                                    SwitchingAwareTrackingEventProcessor trackingEventProcessor) {
         this.subscribingEventProcessor = subscribingEventProcessor;
         this.trackingEventProcessor = trackingEventProcessor;
-        this.currentEventProcessor = subscribingEventProcessor;
+        this.currentEventProcessor = new AtomicReference<>(subscribingEventProcessor);
     }
 
     @Override
     public void startReplay(TrackingToken startPosition) {
-        synchronized (this) {
-            LOGGER.info(String.format("Starting replay and switching to %s", TrackingEventProcessor.class.getSimpleName()));
-            currentEventProcessor.shutDown();
-            currentEventProcessor = trackingEventProcessor;
+        if (currentEventProcessor.compareAndSet(subscribingEventProcessor, trackingEventProcessor)) {
+            LOGGER.info(String.format("Starting replay and switching to %s",
+                    TrackingEventProcessor.class.getSimpleName()));
+            subscribingEventProcessor.shutDown();
             trackingEventProcessor.resetTokens(startPosition);
             start();
             LOGGER.info("Started replay");
+        } else {
+            LOGGER.info("A previous replay is still running");
         }
     }
 
     @Override
     public void stopReplay() {
-        synchronized (this) {
-            LOGGER.info(String.format("Stopping replay and switching to %s", SubscribingEventProcessor.class.getSimpleName()));
-            currentEventProcessor.shutDown();
-            currentEventProcessor = subscribingEventProcessor;
+        if (currentEventProcessor.compareAndSet(trackingEventProcessor, subscribingEventProcessor)) {
+            LOGGER.info(String.format("Stopping replay and switching to %s",
+                    SubscribingEventProcessor.class.getSimpleName()));
+            trackingEventProcessor.shutDown();
             start();
             LOGGER.info("Stopped replay");
+        } else {
+            LOGGER.info("No replay is running");
         }
     }
 
     @Override
     @SuppressWarnings("PMD.CompareObjectsWithEquals")
     public boolean isRelaying() {
-        return currentEventProcessor == trackingEventProcessor;
+        return currentEventProcessor.get() == trackingEventProcessor;
     }
 
     @Override
     public String getName() {
-        return currentEventProcessor.getName();
+        return currentEventProcessor.get().getName();
     }
 
     @Override
     public List<MessageHandlerInterceptor<? super EventMessage<?>>> getHandlerInterceptors() {
-        return currentEventProcessor.getHandlerInterceptors();
+        return currentEventProcessor.get().getHandlerInterceptors();
     }
 
     @Override
     @StartHandler(phase = LOCAL_MESSAGE_HANDLER_REGISTRATIONS)
     public void start() {
-        currentEventProcessor.start();
+        currentEventProcessor.get().start();
     }
 
     @Override
     @ShutdownHandler(phase = LOCAL_MESSAGE_HANDLER_REGISTRATIONS)
     public void shutDown() {
-        currentEventProcessor.shutDown();
+        currentEventProcessor.get().shutDown();
     }
 
     @Override
     public Registration registerHandlerInterceptor(MessageHandlerInterceptor<? super EventMessage<?>> handlerInterceptor) {
-        return currentEventProcessor.registerHandlerInterceptor(handlerInterceptor);
+        return currentEventProcessor.get().registerHandlerInterceptor(handlerInterceptor);
     }
 }

@@ -8,9 +8,6 @@ import org.axonframework.eventhandling.TrackingEventProcessor;
 import org.axonframework.eventhandling.TrackingToken;
 import org.axonframework.eventhandling.tokenstore.TokenStore;
 
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
-
 @Slf4j
 public class SwitchingAwareTrackingEventProcessor implements ReplayableEventProcessor {
 
@@ -19,7 +16,6 @@ public class SwitchingAwareTrackingEventProcessor implements ReplayableEventProc
     private final TransactionManager transactionManager;
     private final TokenStore tokenStore;
     private final int initialSegmentsCount;
-    private final ScheduledExecutorService statusChecker;
 
     public SwitchingAwareTrackingEventProcessor(TrackingEventProcessor delegate,
                                                 TransactionManager transactionManager,
@@ -29,7 +25,6 @@ public class SwitchingAwareTrackingEventProcessor implements ReplayableEventProc
         this.transactionManager = transactionManager;
         this.tokenStore = tokenStore;
         this.initialSegmentsCount = initialSegmentsCount;
-        statusChecker = Executors.newSingleThreadScheduledExecutor();
     }
 
     /**
@@ -56,7 +51,6 @@ public class SwitchingAwareTrackingEventProcessor implements ReplayableEventProc
         delegate.shutDown();
         resetTokens(startPosition);
         delegate.start();
-//        statusChecker.scheduleAtFixedRate()
     }
 
     @Override
